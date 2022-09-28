@@ -92,11 +92,41 @@ async function main() {
       console.log(`  - ${s.name} / ${s.completeDate}`);
     }
   }
+  if (!toDelete.length) {
+    console.log(`Nothing to do.`);
+    return;
+  }
+
+  // Find the most recent snapshot that is not in the keep list:
+  const mostRecentToDelete = toDelete.reduce((acc, cur) => {
+    if (acc === null) { return cur; }
+    if (cur.completeTS > acc.completeTS) { return cur; }
+    return acc;
+  }, null);
+
+  // Find the next snapshot after the most recent one to delete:
+  const nextSnapshot = snapshotList.find((s) => s.completeTS > mostRecentToDelete.completeTS);
+  if (!nextSnapshot) {
+    throw new Error("Could not find the next snapshot after the most recent one to delete.");
+  }
+
+  // Before we can delete any snapshots we will have to delete the PITR chunks which depend on
+  // the snapshots we are deleting. We will delete all chunks older than the "nextSnapshot"
+  // (which is the snapshot after the most recent one we are deleting).
+  if (isVerbose) {
+    console.log("Plan to delete PITR chunks older than", nextSnapshot.completeDate);
+  }
 
   if (!isDryRun) {
+
+    let res = await pbm.deletePITR({force: true, "older-than": nextSnapshot.completeDate});
+    console.log("Deleted PITR chunks: ", res.split("\n").filter(Boolean)[0]);
+
     for (const s of toDelete) {
       try {
-        await pbm.deleteBackup({name: s.name, force: true});
+        console.log(`Deleting ${s.name}...`);
+        res = await pbm.deleteBackup({name: s.name, force: true});
+        console.log(`${res.split("\n").filter(Boolean)[0]} - Deleted ${s.name}.`);
       } catch (err) {
         console.error(`Error deleting snapshot ${s.name}: `, err);
       }
