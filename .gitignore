@@ -1,0 +1,5 @@
+gradient-prod.env
+node_modules
+dist
+*.env
+package-lock.json
