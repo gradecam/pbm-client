@@ -1,6 +1,7 @@
 
 import exec from './processExec';
 import which from 'which';
+import { DateTime } from 'luxon';
 
 let pbmBin = process.env.PBM_BIN || '';
 
@@ -114,7 +115,11 @@ function prepareOptions<T extends PBMCommandOptions>(opts: T): string[] {
 
   for (const [key, value] of Object.entries(opts)) {
     if (specialKeys.includes(key)) continue;
-    if (value === true) {
+    if (value instanceof Date) {
+      const dtVal = DateTime.fromJSDate(value);
+      // UTC format like 2006-01-02T15:04:05
+      args.push(`--${key}`, dtVal.toUTC().toFormat('yyyy-MM-dd\'T\'HH:mm:ss'));
+    } else if (value === true) {
       args.push(`--${key}`);
     } else {
       args.push(`--${key}`, String(value));
