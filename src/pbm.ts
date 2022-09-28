@@ -6,6 +6,7 @@ let pbmBin = process.env.PBM_BIN || '';
 
 // <none>/<gzip>/<snappy>/<lz4>/<s2>/<pgzip>/<zstd>
 export type PBMCompressionType = 'none' | 'gzip' | 'snappy' | 'lz4' | 's2' | 'pgzip' | 'zstd';
+export type PBMSnapshotStatus = 'done' | 'error' | 'running' | 'canceled';
 
 export interface PBMCommandOptions {
   'mongodb-uri'?: string;
@@ -54,7 +55,7 @@ export interface PBMVersion {
 };
 export interface PBMSnapshot {
   name: string;
-  status: string;
+  status: PBMSnapshotStatus;
   completeTS: number;
   completeDate: Date;
   pbmVersion: string;
@@ -90,8 +91,15 @@ export interface PBMList {
     ranges: PBMPITRRange[];
   }
 }
+// example: `{"msg":"Backup cancellation has started"}`
 export interface PBMResponse {
   msg: string;
+}
+
+// example: `{"name":"2022-09-28T20:21:54Z","storage":"s3://https://s3-backup.signalstuff.com/mongodb-bucket-c40d1d68-7ffa-4966-88ca-a8410edd8548/hsdb/aes"}`
+export interface PBMBackupResponse {
+  name: string;
+  storage: string;
 }
 
 async function _getBinPath(name: string) {
@@ -119,20 +127,38 @@ function prepareOptions<T extends PBMCommandOptions>(opts: T): string[] {
   return args;
 }
 
-export async function pbm<T extends Record<string, any>>(command: string, ...args: string[]) {
-  const bin = await _getBinPath('pbm');
-  const json = await exec(bin, [
-    '-o', 'json',
+export type PBMCommand = 'backup' | 'delete-backup' | 'cancel-backup' | 'delete-pitr' | 'list' | 'version' | 'logs' | 'status';
+export const PBMTextCommand = [
+  'delete-backup', 'delete-pitr',
+] as const;
+export type PBMTextCommand = typeof PBMTextCommand[number];
+
+export async function pbm(command: PBMTextCommand, ...args: string[]): Promise<string>;
+export async function pbm<T extends Record<string, any> = PBMResponse>(command: Exclude<PBMCommand, PBMTextCommand>, ...args: string[]): Promise<T>;
+export async function pbm<T>(command: PBMCommand, ...args: string[]) {
+  let bin: string;
+  try {
+    bin = await _getBinPath('pbm');
+  } catch (err) {
+    throw new Error(`pbm binary not found. Please set PBM_BIN environment variable to the path of the pbm binary. Error: ${err.message}`);
+  }
+  const isTextCommand = PBMTextCommand.includes(command as PBMTextCommand);
+  const cmdOut = await exec(bin, [
+    ...(!isTextCommand ? ['-o', 'json'] : []),
     command,
     ...args,
   ]);
 
-  const obj = JSON.parse(json);
-  return obj as T;
+  if (isTextCommand) {
+    return cmdOut;
+  } else {
+    const obj = JSON.parse(cmdOut);
+    return obj as T;
+  }
 }
 
 export async function version() {
-  return pbm<PBMVersion>('version');
+  return await pbm<PBMVersion>('version');
 }
 
 export async function list(opts: PBMCommandOptions = {}) {
@@ -146,29 +172,31 @@ export async function list(opts: PBMCommandOptions = {}) {
 
 export async function logs(opts: PBMCommandOptions = {}) {
   const args = prepareOptions(opts);
-  return pbm<PBMLogEntry[]>('logs', ...args);
+  return await pbm<PBMLogEntry[]>('logs', ...args);
 }
 
 export async function cancelBackup(opts: PBMCommandOptions = {}) {
   const args = prepareOptions(opts);
-  return pbm<PBMResponse>('cancel-backup', ...args);
+  return await pbm<PBMResponse>('cancel-backup', ...args);
 }
+
+// Example output:
 
 export async function backup(opts: PBMBackupOptions = {}) {
   const args = prepareOptions(opts);
-  return pbm<PBMResponse>('backup', ...args);
+  return await pbm<PBMResponse>('backup', ...args);
 }
 
 export async function deleteBackup(opts: PBMDeleteBackupOptions) {
   const args = prepareOptions(opts);
 
-  return pbm<PBMResponse>('delete-backup', ...args);
+  return await pbm('delete-backup', ...args);
 }
 
 export async function deletePITR(opts: PBMDeleteBackupBeforeDateOptions) {
   const args = prepareOptions(opts);
 
-  return pbm<PBMResponse>('delete-pitr', ...args);
+  return await pbm('delete-pitr', ...args);
 }
 
 export interface PBMClusterNodeStatus {
@@ -201,5 +229,10 @@ export interface PBMStatus {
 
 export async function status(opts: PBMCommandOptions = {}) {
   const args = prepareOptions(opts);
-  return pbm<PBMStatus>('status', ...args);
+  const status = await pbm<PBMStatus>('status', ...args);
+
+  status.backups.snapshot = status.backups.snapshot.map(processSnapshot);
+  status.backups.pitrChunks.pitrChunks = status.backups.pitrChunks.pitrChunks.map(processPITRRange);
+
+  return status;
 }
