@@ -1,10 +1,19 @@
 {
-  "name": "pbm",
-  "version": "1.0.0",
+  "name": "pbm-client",
+  "version": "0.0.9",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc -p .",
+    "prepublish": "npm run build"
+  },
+  "bin": {
+    "pbm-prune-backups": "dist/pruneOld.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com:gradecam/pbm"
   },
   "author": "",
   "license": "ISC",
@@ -25,5 +34,10 @@
     "source-map-support": "^0.5.21",
     "tslib": "^2.4.0",
     "which": "^2.0.2"
-  }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ]
 }
