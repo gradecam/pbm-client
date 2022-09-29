@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 
 // Default retension policy -- override it using the environment variables:
 //   PBM_RETENTION_DAYS - how many days to keep
