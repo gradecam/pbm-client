@@ -57,14 +57,14 @@ export interface PBMVersion {
 export interface PBMSnapshot {
   name: string;
   status: PBMSnapshotStatus;
-  completeTS: number;
-  completeDate: Date;
+  restoreTo: number;
+  restoreDate: Date;
   pbmVersion: string;
   type: string;
 };
 function processSnapshot(snapshot: PBMSnapshot): PBMSnapshot {
-  if (snapshot.completeTS) {
-    snapshot.completeDate = new Date(snapshot.completeTS * 1000);
+  if (snapshot.restoreTo) {
+    snapshot.restoreDate = new Date(snapshot.restoreTo * 1000);
   }
   return snapshot;
 }

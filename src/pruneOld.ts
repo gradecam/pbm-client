@@ -69,10 +69,10 @@ async function main() {
 
   const curList = await pbm.list();
   const snapshotList = curList.snapshots;
-  snapshotList.sort((a, b) => a.completeTS - b.completeTS);
+  snapshotList.sort((a, b) => a.restoreTo - b.restoreTo);
 
   const keepList = whichToKeep({
-    dateField: 'completeDate',
+    dateField: 'restoreDate',
     days: keepDays,
     weeks: keepWeeks,
     months: keepMonths,
@@ -84,13 +84,13 @@ async function main() {
   console.log(`Keeping ${keepList.length} snapshots out of ${snapshotList.length} total.`);
   if (isVerbose) {
     for (const s of keepList) {
-      console.log(`  - ${s.name} ${s.completeDate}`);
+      console.log(`  - ${s.name} ${s.restoreDate}`);
     }
   }
   console.log(`Deleting ${toDelete.length} snapshots:`);
   if (isVerbose) {
     for (const s of toDelete) {
-      console.log(`  - ${s.name} / ${s.completeDate}`);
+      console.log(`  - ${s.name} / ${s.restoreDate}`);
     }
   }
   if (!toDelete.length) {
@@ -101,12 +101,12 @@ async function main() {
   // Find the most recent snapshot that is not in the keep list:
   const mostRecentToDelete = toDelete.reduce((acc, cur) => {
     if (acc === null) { return cur; }
-    if (cur.completeTS > acc.completeTS) { return cur; }
+    if (cur.restoreTo > acc.restoreTo) { return cur; }
     return acc;
   }, null);
 
   // Find the next snapshot after the most recent one to delete:
-  const nextSnapshot = snapshotList.find((s) => s.completeTS > mostRecentToDelete.completeTS);
+  const nextSnapshot = snapshotList.find((s) => s.restoreTo > mostRecentToDelete.restoreTo);
   if (!nextSnapshot) {
     throw new Error("Could not find the next snapshot after the most recent one to delete.");
   }
@@ -115,12 +115,12 @@ async function main() {
   // the snapshots we are deleting. We will delete all chunks older than the "nextSnapshot"
   // (which is the snapshot after the most recent one we are deleting).
   if (isVerbose) {
-    console.log("Plan to delete PITR chunks older than", nextSnapshot.completeDate);
+    console.log("Plan to delete PITR chunks older than", nextSnapshot.restoreDate);
   }
 
   if (!isDryRun) {
 
-    let res = await pbm.deletePITR({force: true, "older-than": nextSnapshot.completeDate});
+    let res = await pbm.deletePITR({force: true, "older-than": nextSnapshot.restoreDate});
     console.log("Deleted PITR chunks: ", res.split("\n").filter(Boolean)[0]);
 
     for (const s of toDelete) {

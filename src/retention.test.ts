@@ -6,8 +6,8 @@ import { whichToKeep } from './retention';
 import hsData from './testData/exampleList';
 
 function processSnapshot(snapshot: PBMSnapshot): PBMSnapshot {
-  if (snapshot.completeTS) {
-    snapshot.completeDate = new Date(snapshot.completeTS * 1000);
+  if (snapshot.restoreTo) {
+    snapshot.restoreDate = new Date(snapshot.restoreTo * 1000);
   }
   return snapshot;
 }
@@ -32,7 +32,7 @@ test("hs data should exist and parse", async () => {
 test("retension calculation should work", async () => {
   const snapshots = hsData.snapshots as PBMSnapshot[];
   const keepList = whichToKeep({
-    dateField: 'completeDate',
+    dateField: 'restoreDate',
     days: 7,
     weeks: 3,
     months: 2,
