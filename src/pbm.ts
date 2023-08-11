@@ -9,6 +9,9 @@ let pbmBin = process.env.PBM_BIN || '';
 export type PBMCompressionType = 'none' | 'gzip' | 'snappy' | 'lz4' | 's2' | 'pgzip' | 'zstd';
 export type PBMSnapshotStatus = 'done' | 'error' | 'running' | 'canceled';
 
+export const PBMSnapshotType = ['physical', 'logical', 'incremental'] as const;
+export type PBMSnapshotType = typeof PBMSnapshotType[number];
+
 export interface PBMCommandOptions {
   'mongodb-uri'?: string;
 }
@@ -60,11 +63,19 @@ export interface PBMSnapshot {
   restoreTo: number;
   restoreDate: Date;
   pbmVersion: string;
-  type: string;
+  type: PBMSnapshotType;
+  isBase?: boolean;
+  /** if not empty string refers to another "incremental" type snapshot name */
+  src: string;
 };
 function processSnapshot(snapshot: PBMSnapshot): PBMSnapshot {
   if (snapshot.restoreTo) {
     snapshot.restoreDate = new Date(snapshot.restoreTo * 1000);
+  }
+  if (snapshot.type === 'incremental') {
+    if (!snapshot.src) {
+      snapshot.isBase = true;
+    }
   }
   return snapshot;
 }
