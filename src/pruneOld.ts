@@ -23,6 +23,7 @@ program
   .option('-w, --weeks <weeks>', 'how many weeks to keep', String(defaultKeepWeeks))
   .option('-m, --months <months>', 'how many months to keep', String(defaultKeepMonths))
   .option('-y, --years <years>', 'how many years to keep', String(defaultKeepYears))
+  .option('-t, --type <type>', 'what type of backups to consider and/or prune (defaults to all)')
   .option('-v, --verbose', 'verbose output')
   .option('-f, --force', `Actually delete the snapshots (without this flag it is a dry run)`)
   .parse(process.argv);
@@ -33,6 +34,8 @@ const keepDays = parseInt(options.days, 10);
 const keepWeeks = parseInt(options.weeks, 10);
 const keepMonths = parseInt(options.months, 10);
 const keepYears = parseInt(options.years, 10);
+
+const type = options.type as pbm.PBMSnapshotType | undefined;
 
 const isVerbose = !!options.verbose;
 const isDryRun = !options.force;
@@ -68,11 +71,16 @@ async function main() {
   }
 
   const curList = await pbm.list();
-  const snapshotList = curList.snapshots;
+  let snapshotList = curList.snapshots;
+  if (type) {
+    snapshotList = snapshotList.filter((s) => s.type === type);
+  }
   snapshotList.sort((a, b) => a.restoreTo - b.restoreTo);
 
   const keepList = whichToKeep({
     dateField: 'restoreDate',
+    nameField: 'name',
+    parentField: 'src',
     days: keepDays,
     weeks: keepWeeks,
     months: keepMonths,
