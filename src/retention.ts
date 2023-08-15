@@ -41,7 +41,13 @@ export function whichToKeep<dateField extends string,
                             nameField extends string,
                             parentField extends string,
                             RecordType extends KeepRecord<dateField, nameField, parentField>>(config: toKeepConfig<dateField, nameField, parentField>, records: RecordType[]) {
-  const now = new Date();
+  const f = config.dateField;
+  records.sort((a, b) => {
+    return a[f].getTime() - b[f].getTime();
+  });
+  // Instead of keeping from "now" we'll keep from the newest entry -- that way if backups cease we won't trim the old
+  // ones, etc etc.
+  const latestDate = records[records.length - 1][f];
   const years: Record<string, RecordType> = {};
   const yearEntries: RecordType[] = [];
   const months: Record<string, RecordType> = {};
@@ -67,10 +73,9 @@ export function whichToKeep<dateField extends string,
   // filter records and drop any which don't have a full parent tree (that the ultimate parent is missing)
   records = records.filter(r => hasParentTree(r[config.parentField]));
 
-  const f = config.dateField;
   for (const record of records) {
     const dt = record[f];
-    const duration = Interval.fromDateTimes(DateTime.fromJSDate(dt), DateTime.fromJSDate(now));
+    const duration = Interval.fromDateTimes(DateTime.fromJSDate(dt), DateTime.fromJSDate(latestDate));
     const year = Math.floor(duration.length('years'));
     const month = Math.floor(duration.length('months'));
     const week = Math.floor(duration.length('weeks'));
@@ -96,13 +101,11 @@ export function whichToKeep<dateField extends string,
 
   // We keep the newest _n_ records from each group, where _n_ is the
   // number of records we want to keep for that group specified in the config
-  // -- we add 1 because if we keep "2 years" that means to keep the previous two years,
-  // which means we always need to keep the oldest one in the last year as well, etc etc
   const toKeep: RecordType[] = uniq([
-    ...yearEntries.slice(-(config.years + 1)),
-    ...monthEntries.slice(-(config.months + 1)),
-    ...weekEntries.slice(-(config.weeks + 1)),
-    ...dayEntries.slice(-(config.days + 1)),
+    ...yearEntries.slice(-config.years),
+    ...monthEntries.slice(-config.months),
+    ...weekEntries.slice(-config.weeks),
+    ...dayEntries.slice(-config.days),
   ]);
 
   // If any of the records we need to keep have parents then we have to keep the parents as well

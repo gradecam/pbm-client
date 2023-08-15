@@ -1,7 +1,7 @@
 export const exampleList = {
   snapshots: [
     {
-      name: "2021-05-25T21:04:36Z",
+      name: "2021-05-25T21:14:36Z",
       status: "done",
       restoreTo: 1621976676,
       pbmVersion: "1.7.0",

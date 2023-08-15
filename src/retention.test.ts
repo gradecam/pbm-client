@@ -44,7 +44,7 @@ test("retension calculation should work", async () => {
     years: 2,
   }, snapshots);
 
-  expect(keepList.length).toBe(16);
+  expect(keepList.length).toBe(13);
 });
 
 test("retension calculation should prioritize base snapshots", async () => {
