@@ -98,7 +98,7 @@ async function main() {
   console.log(`Deleting ${toDelete.length} snapshots:`);
   if (isVerbose) {
     for (const s of toDelete) {
-      console.log(`  - ${s.name} / ${s.restoreDate}`);
+      console.log(`  - ${s.name} / ${s.restoreDate} (${s.type})})`);
     }
   }
   if (!toDelete.length) {
@@ -106,30 +106,33 @@ async function main() {
     return;
   }
 
-  // Find the most recent snapshot that is not in the keep list:
-  const mostRecentToDelete = toDelete.reduce((acc, cur) => {
+  // Find the most recent logical snapshot that is not in the keep list:
+  const mostRecentToDelete = toDelete.filter(i => i.type === 'logical').reduce((acc, cur) => {
     if (acc === null) { return cur; }
     if (cur.restoreTo > acc.restoreTo) { return cur; }
     return acc;
-  }, null);
+  }, null as pbm.PBMSnapshot | null);
 
-  // Find the next snapshot after the most recent one to delete:
-  const nextSnapshot = snapshotList.find((s) => s.restoreTo > mostRecentToDelete.restoreTo);
-  if (!nextSnapshot) {
+  // Find the next logical snapshot after the most recent one to delete:
+  const nextLogicalSnapshot = snapshotList.find((s) => s.type === 'logical' && s.restoreTo > mostRecentToDelete.restoreTo);
+  if (!nextLogicalSnapshot) {
     throw new Error("Could not find the next snapshot after the most recent one to delete.");
   }
+  const shouldTrimPitr = !type || type === 'logical' && !!nextLogicalSnapshot;
 
   // Before we can delete any snapshots we will have to delete the PITR chunks which depend on
   // the snapshots we are deleting. We will delete all chunks older than the "nextSnapshot"
   // (which is the snapshot after the most recent one we are deleting).
-  if (isVerbose) {
-    console.log("Plan to delete PITR chunks older than", nextSnapshot.restoreDate);
+  if (isVerbose && shouldTrimPitr) {
+    console.log("Plan to delete PITR chunks older than", nextLogicalSnapshot.restoreDate);
   }
 
   if (!isDryRun) {
-
-    let res = await pbm.deletePITR({force: true, "older-than": nextSnapshot.restoreDate});
-    console.log("Deleted PITR chunks: ", res.split("\n").filter(Boolean)[0]);
+    let res: string;
+    if (shouldTrimPitr) {
+      res = await pbm.deletePITR({force: true, "older-than": nextLogicalSnapshot.restoreDate});
+      console.log("Deleted PITR chunks: ", res.split("\n").filter(Boolean)[0]);
+    }
 
     for (const s of toDelete) {
       try {
